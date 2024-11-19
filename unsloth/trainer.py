@@ -19,13 +19,13 @@ from functools import wraps
 
 import trl
 import inspect
-from trl import SFTTrainer
+from trl import SFTTrainer 
 try:
     from trl import SFTConfig as TrainingArguments
 except:
-    from transformers import TrainingArguments
+    from transformers import TrainingArguments , Trainer
 pass
-from . import is_bfloat16_supported
+from unsloth import is_bfloat16_supported
 from unsloth_zoo.training_utils import unsloth_train as _unsloth_train
 from packaging.version import Version
 import dataclasses
@@ -33,6 +33,7 @@ import dataclasses
 __all__ = [
     "UnslothTrainingArguments",
     "UnslothTrainer",
+    "UnslothSFTrainer",
     "unsloth_train",
     "_patch_trl_trainer",
 ]
@@ -114,7 +115,7 @@ def _create_unsloth_optimizer(
 pass
 
 
-class UnslothTrainer(SFTTrainer):
+class UnslothSFTrainer(SFTTrainer):
     def create_optimizer(self):
         embedding_learning_rate = getattr(self.args, "embedding_learning_rate", None)
         if embedding_learning_rate is None: return super().create_optimizer()
@@ -131,6 +132,26 @@ class UnslothTrainer(SFTTrainer):
         return self.optimizer
     pass
 pass
+
+
+class UnslothTrainer(Trainer):
+    def create_optimizer(self):
+        embedding_learning_rate = getattr(self.args, "embedding_learning_rate", None)
+        if embedding_learning_rate is None: return super().create_optimizer()
+
+        if self.optimizer is None:
+            optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            self.optimizer = _create_unsloth_optimizer(
+                self.model,
+                optimizer_cls,
+                optimizer_kwargs,
+                embedding_learning_rate,
+            )
+        pass
+        return self.optimizer
+    pass
+pass
+
 
 # From `trl>=0.13.0`, they changed how to pass several params to the trainer
 # We need to patch to make the transition smooth

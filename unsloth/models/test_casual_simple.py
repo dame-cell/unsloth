@@ -1,52 +1,33 @@
+# Import necessary libraries
 import torch
-from unsloth.models import FastCasualModel
+from unsloth.models.loader import FastCasualModel
+from transformers import AutoTokenizer
 
-# Create model with full configuration
-model, tokenizer = FastCasualModel.from_pretrained(
-    model_name="unsloth/Llama-3.2-3B",
-    max_seq_length=2048,
-    device_map="cpu",     # Use CPU for testing
+# Initialize the tokenizer
+tokenizer = AutoTokenizer.from_pretrained("unsloth/Llama-3.2-3B")
+
+# Create model with small architecture for testing
+model, tokenizer = FastCasualModel.create_for_pretraining(
+    tokenizer=tokenizer,
+    max_seq_length=32,          # Reduced from 2048
+    device_map="cpu",           # Use CPU for testing
     attention_bias=False,
     attention_dropout=0.0,
     hidden_act="silu",
-    hidden_size=4096,
+    hidden_size=128,            # Reduced from 4096
     initializer_range=0.02,
-    intermediate_size=11008,
-    num_attention_heads=32,
-    num_hidden_layers=32,
-    num_key_value_heads=32,
+    intermediate_size=256,      # Reduced from 11008
+    num_attention_heads=4,      # Reduced from 32
+    num_hidden_layers=2,        # Reduced from 32
+    num_key_value_heads=4,      # Reduced from 32
     pretraining_tp=1,
     rms_norm_eps=1e-6,
     rope_theta=10000.0,
 )
 
 # Print model configuration
+total_params = sum(p.numel() for p in model.parameters())
+print("Total number of parameters:", total_params)
 config = model.config
-print("\nModel Configuration:")
-print(f"vocab_size: {config.vocab_size}")
-print(f"hidden_size: {config.hidden_size}")
-print(f"num_attention_heads: {config.num_attention_heads}")
-print(f"num_hidden_layers: {config.num_hidden_layers}")
-print(f"max_position_embeddings: {config.max_position_embeddings}")
-print(f"intermediate_size: {config.intermediate_size}")
-print(f"num_key_value_heads: {config.num_key_value_heads}")
-print(f"rope_theta: {config.rope_theta}")
-
-# Try a simple forward pass
-input_ids = torch.randint(0, config.vocab_size, (1, 16))
-attention_mask = torch.ones_like(input_ids)
-
-outputs = model(
-    input_ids=input_ids,
-    attention_mask=attention_mask,
-)
-
-print("\nModel Output Shape:", outputs.logits.shape)
-
-# Test training mode
-model = FastCasualModel.for_training(model)
-print("\nTraining Mode:", model.training)
-
-# Test inference mode
-model = FastCasualModel.for_inference(model)
-print("Inference Mode:", model.training)
+print("Model configuration:", config) 
+print(model)

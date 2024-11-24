@@ -73,17 +73,17 @@ import numpy as np
 import warnings, subprocess, re, inspect, psutil, os, math
 from packaging.version import Version
 
-from unsloth_zoo.tokenizer_utils import (
+from ..tokenizer_utils import (
     patch_tokenizer as _patch_tokenizer,
 )
-from unsloth_zoo.patching_utils import (
+from ..patching_utils import (
     patch_compiling_bitsandbytes,
     patch_layernorm,
     patch_torch_compile,
     patch_model_and_tokenizer,
     patch_compiled_autograd,
 )
-from unsloth_zoo.gradient_checkpointing import (
+from ..gradient_checkpointing import (
     Unsloth_Offloaded_Gradient_Checkpointer,
     unsloth_offloaded_gradient_checkpoint,
     patch_unsloth_gradient_checkpointing,
@@ -98,14 +98,14 @@ from unsloth_zoo.gradient_checkpointing import (
     unpatch_unsloth_smart_gradient_checkpointing,
     create_gradient_checkpointing_buffer,
 )
-from unsloth_zoo.loss_utils import (
+from ..loss_utils import (
     HAS_CUT_CROSS_ENTROPY,
     fused_linear_cross_entropy,
 )
-from unsloth_zoo.vision_utils import (
+from ..vision_utils import (
     process_vision_info,
 )
-from unsloth_zoo.compiler import (
+from ..compiler import (
     get_transformers_model_type,
     unsloth_compile_transformers as _unsloth_compile_transformers,
 )
@@ -586,7 +586,7 @@ if Version(peft_version) < Version("0.12.0"):
         LoraLayer.update_layer = LoraLayer_update_layer
     except:
         logger.warning_once(
-            "Unsloth unsuccessfully patched LoraLayer.update_layer. Please file a bug report.\n"\
+            "Unsloth: We unsuccessfully patched LoraLayer.update_layer. Please file a bug report.\n"\
             "Luckily, your training run will still work in the meantime!"
         )
     pass

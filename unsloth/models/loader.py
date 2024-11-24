@@ -17,6 +17,7 @@ from .llama   import FastLlamaModel, logger
 from .mistral import FastMistralModel
 from .qwen2   import FastQwen2Model
 from .cohere  import FastCohereModel
+from .causal  import FastBaseCasualModel
 from transformers import AutoConfig
 from transformers import __version__ as transformers_version
 from peft import PeftConfig, PeftModel
@@ -543,6 +544,99 @@ class FastVisionModel(FastBaseVisionModel):
             # Patch it as well!
             model = FastBaseVisionModel.patch_peft_model(model, use_gradient_checkpointing)
         pass
+        return model, tokenizer
+    pass
+pass
+
+
+class FastCasualModel(FastBaseCasualModel):
+    @staticmethod
+    def from_pretrained(
+        model_name                 = "unsloth/Llama-3.2-3B",
+        max_seq_length            = 2048,
+        dtype                     = None,
+        load_in_4bit             = True,
+        token                    = None,
+        device_map               = "sequential",
+        rope_scaling             = None,
+        fix_tokenizer            = True,
+        trust_remote_code        = False,
+        use_gradient_checkpointing = "unsloth",
+        resize_model_vocab       = None,
+        revision                 = None,
+        attention_bias          = False,
+        attention_dropout       = 0.0,
+        hidden_act             = "silu",
+        hidden_size            = 4096,
+        initializer_range      = 0.02,
+        intermediate_size      = 11008,
+        num_attention_heads    = 32,
+        num_hidden_layers      = 32,
+        num_key_value_heads    = 32,
+        pretraining_tp         = 1,
+        rms_norm_eps           = 1e-6,
+        rope_theta             = 10000.0,
+        *args, **kwargs,
+    ):
+        if token is None: token = get_token()
+        
+        patch_compiled_autograd()
+        patch_compiling_bitsandbytes()
+        if use_gradient_checkpointing == "unsloth":
+            patch_unsloth_smart_gradient_checkpointing()
+        
+        old_model_name = model_name
+        model_name = get_model_name(model_name, load_in_4bit)
+
+        with contextlib.redirect_stdout(open(os.devnull, "w")):
+            patch_loss_functions(torch_compile = False)
+            model_types = unsloth_compile_transformers(
+                model_name              = model_name,
+                sdpa_dynamic_mask       = True,
+                sdpa_bool_masks         = True,
+                sdpa_gqa_replace        = True,
+                sdpa_dynamic_compile    = True,
+                compile_attention       = True,
+                disable_causal_masks    = True,
+                compile_torch_modules   = True,
+                compile_custom_modules  = True,
+                compile_function_calls  = True,
+                fuse_lm_head            = True,
+                gradient_checkpointing  = True,
+                manual_replacements     = True,
+                epilogue_fusion         = True,
+                max_autotune            = False,
+                shape_padding           = True,
+                cudagraphs              = False,
+                debug                   = False,
+                import_from_cache       = False,
+                disable                 = False,
+            )
+
+        # Create model and tokenizer using parent class
+        model, tokenizer = super().create_for_pretraining(
+            tokenizer=tokenizer,
+            max_seq_length=max_seq_length,
+            dtype=dtype,
+            device_map=device_map,
+            rope_scaling=rope_scaling,
+            trust_remote_code=trust_remote_code,
+            use_gradient_checkpointing=use_gradient_checkpointing,
+            attention_bias=attention_bias,
+            attention_dropout=attention_dropout,
+            hidden_act=hidden_act,
+            hidden_size=hidden_size,
+            initializer_range=initializer_range,
+            intermediate_size=intermediate_size,
+            num_attention_heads=num_attention_heads,
+            num_hidden_layers=num_hidden_layers,
+            num_key_value_heads=num_key_value_heads,
+            pretraining_tp=pretraining_tp,
+            rms_norm_eps=rms_norm_eps,
+            rope_theta=rope_theta,
+            *args, **kwargs,
+        )
+
         return model, tokenizer
     pass
 pass

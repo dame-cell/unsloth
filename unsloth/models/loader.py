@@ -555,15 +555,11 @@ class FastCasualModel(FastBaseCasualModel):
         model_name                 = "unsloth/Llama-3.2-3B",
         max_seq_length            = 2048,
         dtype                     = None,
-        load_in_4bit             = True,
-        token                    = None,
         device_map               = "sequential",
         rope_scaling             = None,
-        fix_tokenizer            = True,
         trust_remote_code        = False,
         use_gradient_checkpointing = "unsloth",
-        resize_model_vocab       = None,
-        revision                 = None,
+        # Llama model configuration
         attention_bias          = False,
         attention_dropout       = 0.0,
         hidden_act             = "silu",
@@ -578,16 +574,13 @@ class FastCasualModel(FastBaseCasualModel):
         rope_theta             = 10000.0,
         *args, **kwargs,
     ):
-        if token is None: token = get_token()
-        
+        # Apply optimization patches
         patch_compiled_autograd()
         patch_compiling_bitsandbytes()
         if use_gradient_checkpointing == "unsloth":
             patch_unsloth_smart_gradient_checkpointing()
         
-        old_model_name = model_name
-        model_name = get_model_name(model_name, load_in_4bit)
-
+        # Apply Triton kernel optimizations
         with contextlib.redirect_stdout(open(os.devnull, "w")):
             patch_loss_functions(torch_compile = False)
             model_types = unsloth_compile_transformers(
@@ -601,23 +594,30 @@ class FastCasualModel(FastBaseCasualModel):
                 compile_torch_modules   = True,
                 compile_custom_modules  = True,
                 compile_function_calls  = True,
-                fuse_lm_head            = True,
+                fuse_lm_head           = True,
                 gradient_checkpointing  = True,
                 manual_replacements     = True,
                 epilogue_fusion         = True,
-                max_autotune            = False,
-                shape_padding           = True,
-                cudagraphs              = False,
-                debug                   = False,
-                import_from_cache       = False,
-                disable                 = False,
+                max_autotune           = False,
+                shape_padding          = True,
+                cudagraphs             = False,
+                debug                  = False,
+                import_from_cache      = False,
+                disable                = False,
             )
 
-        # Create model and tokenizer using parent class
+        # Create tokenizer
+        from transformers import Autotokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            trust_remote_code=trust_remote_code
+        )
+            
+        # Create model from scratch using parent class
         model, tokenizer = super().create_for_pretraining(
             tokenizer=tokenizer,
             max_seq_length=max_seq_length,
-            dtype=dtype,
+            dtype=_get_dtype(dtype),
             device_map=device_map,
             rope_scaling=rope_scaling,
             trust_remote_code=trust_remote_code,
@@ -637,6 +637,11 @@ class FastCasualModel(FastBaseCasualModel):
             *args, **kwargs,
         )
 
+        # Add model tags
+        if hasattr(model, "add_model_tags"):
+            model.add_model_tags(["unsloth"])
+        if hasattr(tokenizer, "add_model_tags"):
+            tokenizer.add_model_tags(["unsloth"])
+
         return model, tokenizer
-    pass
 pass
